@@ -1,0 +1,91 @@
+package pbcfg;
+
+// Action 对应一次交互行为
+message Action {
+	// 请求包唯一名, 可以不给, 表示该 Action 一开始就在等待接受消息
+	// (seeto: Body.uniq_name, eg: login-0)
+	repeated string request_uniq_name = 1;
+	// 期待回包消息名, 可有多个 (eg: ISeer20CSProto.login_out)
+	repeated string response = 2;
+	// timeout 时间内(秒)没完成交互就强行终止该 Action, 0表示没有timeout (一直等到min_duration)
+	optional int32 timeout = 3 [default = 1];
+	// 从第几个 loop_count 开始就不执行该Action了
+	// (从1开始, 0表示持续到 Group 结束), 通常登陆包都需要配置成1(只在第一次轮询的时候才执行)
+	optional int32 stop_loop_count = 5 [default = 0];
+	// 最短持续时长 (毫秒), 如果在此时长内已经收到所有 response, 也需等到该时长到期;
+	// 如果在此过程中超时, 也仅记下超时的状况, 仍然需要等到该时间到期才会退出该Action;
+	// 0 表示没有最短持续时长, 一旦Action执行完毕就立刻切换;
+	optional int32 min_duration = 6 [default = 0];
+}
+
+// 有效(可正常登陆)客户端米米号
+message Client {
+	required uint32 uid = 1;
+	required int32 role_time = 2;
+}
+
+// 1个 Group 里的所有 client 的行为都一样
+// 用于描述该group所管理的机器人的数量和行为
+message Group {
+	// 群名称(可以是UTF-8字符串), 唯一标识该群 (即: 群不能重名)
+	required bytes name = 1;
+
+	// 交互环境设置
+	required string peer_addr = 2;
+	required int32 max_pkg_len = 4;
+	required bool has_checksum = 5;
+
+
+	// 客户端数量, 由于单个 Group 内的客户端是采用轮询的方式执行Action,
+	// 因此, 为了Action的执行效率考虑, 建议不要超过500,
+	// 另外如果 Action 中有长时间等待/阻塞的步骤, 则要精心设计各个action的timeout,
+	// 以保证不会由于某个Action的超时导致其它Action也超时)
+	required int32 client_count = 6;
+
+	// 该 Group 内, 执行 action 的循环次数
+	// (可以设置成0次, 以不在配置中删除它, 而暂时跳过该 Group)
+	optional int32 loop_count = 7 [default = 1];
+
+	// 该 Group 要执行的所有行为, 且配置顺序就是执行顺序
+	// (eg: login_in 通常是第一个Action)
+	repeated Action action = 8;
+
+	// 所有 Group 的 client_size() 相加不能超过最大客户端数量
+	// 本群的 client_size() 必须大于等于 client_count, 否则 robot 拒绝启动
+	// 全局(不同群)的 client 不允许有相同的 (high32(uid) | low32(role_time)), 否则拒绝启动
+	repeated Client client = 9;
+}
+
+// robot所有会用到的发送的协议包体内容 (包括所有的 request)
+// NOTE(zog):
+// (1) 如果发现任何 uniq_name 对应的配置中的 type_name 无法创建消息, 那么 robot 会拒绝启动
+// (2) 如果发现任何 Action 中的 request 没有任何对应的uniq_name, 那么 robot 会拒绝启动
+// (3) robot根据 client 配置组包头, 所以text中不需要配置包头内容
+message Body {
+	// uniq_name 用来区别相同 type_name 的不同配置, 必须全局唯一
+	required string uniq_name = 1;
+	// 用来构建消息包体的消息名 (即: google::protobuf::Message::GetTypeName() 返回的那个)
+	required string type_name = 2;
+	// 具体的消息内容
+	required bytes text = 3;
+}
+
+// 所有 Group 的起点, robot 从此处开始加载配置
+message CfgRoot {
+	// action中用到的协议(request+response)的proto定义所在目录 或 .proto 文件
+	// NOTE(zog): 必须是直接目录或.proto文件, 否则就认为是错误配置 (因为扫描不会递归该目录的子目录)
+	repeated bytes proto_path = 1;
+	// 群配置
+	repeated Group group_config = 2;
+	// 所有交互协议数据
+	repeated Body body = 3;
+}
+
+// 复制于 ISeer20CSProto.cs_msg_head_t 的定义
+message CsMsgHead {
+	required string msg_type_name = 1;
+	required uint32 uid = 2;
+	required int32 role_tm = 3;
+	required uint32 ret = 4;
+	optional uint32 seq = 5 [default = 0];
+}

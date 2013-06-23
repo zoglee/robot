@@ -1,0 +1,7 @@
+#!/bin/bash
+
+protoc --cpp_out=./proto/out --proto_path=./proto ./proto/*.proto
+[[ $? != 0 ]] && exit 1
+
+# cmake ...
+./COMPILE -j3 clean all

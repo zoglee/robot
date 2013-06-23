@@ -1,0 +1,10 @@
+#!/bin/bash
+
+BIN="./robot"
+LOG_DIR="./log"
+
+mkdir -p $LOG_DIR
+
+./prepare/main ./prepare/enter_map/enter_map.prepare.sql
+
+${BIN}

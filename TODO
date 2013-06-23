@@ -1,0 +1,6 @@
+1. 统计 (结果/错误更直观, 更利于程序处理)
+2. 配置划分更合理(测试账号配置/包体内容配置/robot本身的配置 三类配置分成3个 .pbconf 来维护)
+3. codec 接口 (使得可以兼容开发各种不同的打包解包的方案), 但codec肯定的一个接口是要能从某个文件或某个std::string中Parse出对应的message(不一定要protobuf的message的, 只要连接双方都知道怎么打包解包就可以了);
+4. 网络层去除轮询机制, 改用事件机制(libev), 支持更好的收包行为 (这是为了解决在公网确实可能很多包的延迟时间较长, 超时可以判断, 但如果timeout之后在执行后续action的时候, 前面action的回包再回来就会影响后面action的结果 (这是假设前后两个action都期待某个response的前提下))
+5. prepare脚本(需考虑用相应的 .pbconf 来生成, 这样自动化程度最高, 比如: 把testclient.pbconf 里配置的米米号 结合 body.pbconf 的内容初始化db的user表, etc)
+6. 完全模拟一个client, client从一个"协议收发器" 进化成一个 "带状态的客户端"

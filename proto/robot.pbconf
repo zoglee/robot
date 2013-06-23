@@ -1,0 +1,59 @@
+proto_path: "./svc_proto"
+
+group_config: {
+	name: "sample_group"
+	peer_addr: "127.0.0.1:8888"
+	max_pkg_len: 32768
+	has_checksum: true
+	client_count: 3
+	loop_count: 20
+	action: {
+		request_uniq_name: "login-normal"
+		response: "Proto.login_out"
+		response: "Proto.player_enter_map_out"
+		response: "Proto.notify_player_enter_map_out"
+		stop_loop_count: 1
+	}
+	action: {
+		request_uniq_name: "enter_map-go10023(home)"
+		response: "Proto.player_enter_map_out"
+		response: "Proto.notify_player_enter_map_out"
+		min_duration: 2000
+	}
+	action: {
+		request_uniq_name: "enter_map-go10001(base)"
+		response: "Proto.player_enter_map_out"
+		response: "Proto.notify_player_enter_map_out"
+		min_duration: 1000
+	}
+
+	client: {
+		uid: 10001
+		role_time: 1371525696
+	}
+	client: {
+		uid: 10002
+		role_time: 1371207764
+	}
+	client: {
+		uid: 10004
+		role_time: 1371450251
+	}
+}
+
+body: {
+	uniq_name: "login-normal"
+	type_name: "Proto.login_in"
+	text: "session: \"11111111\""
+		  "version: 0x1000001"
+}
+body: {
+	uniq_name: "enter_map-go10023(home)"
+	type_name: "Proto.player_enter_map_in"
+	text: "map_id: 10023"
+}
+body: {
+	uniq_name: "enter_map-go10001(base)"
+	type_name: "Proto.player_enter_map_in"
+	text: "map_id: 10001"
+}
