@@ -81,7 +81,7 @@ message CfgRoot {
 	repeated Body body = 3;
 }
 
-// 复制于 ISeer20CSProto.cs_msg_head_t 的定义
+// 复制于业务服务端proto的定义
 message CsMsgHead {
 	required string msg_type_name = 1;
 	required uint32 uid = 2;
