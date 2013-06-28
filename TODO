@@ -7,3 +7,4 @@ robot
 4. 网络层去除轮询机制, 改用事件机制(libev), 支持更好的收包行为 (这是为了解决在公网确实可能很多包的延迟时间较长, 超时可以判断, 但如果timeout之后在执行后续action的时候, 前面action的回包再回来就会影响后面action的结果 (这是假设前后两个action都期待某个response的前提下))
 5. prepare脚本(需考虑用相应的 .pbconf 来生成, 这样自动化程度最高, 比如: 把testclient.pbconf 里配置的米米号 结合 body.pbconf 的内容初始化db的user表, etc)
 6. 完全模拟一个client, client从一个"协议收发器" 进化成一个 "带状态的客户端"
+7. body.text 部分改成 repeated, 同时 action 中加入 body_select_mode {first,order,random,...} 等模式用于支持 {单一,顺序,随机,...} 的请求发送模式;
