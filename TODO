@@ -8,3 +8,4 @@ robot
 5. prepare脚本(需考虑用相应的 .pbconf 来生成, 这样自动化程度最高, 比如: 把testclient.pbconf 里配置的米米号 结合 body.pbconf 的内容初始化db的user表, etc)
 6. 完全模拟一个client, client从一个"协议收发器" 进化成一个 "带状态的客户端"
 7. body.text 部分改成 repeated, 同时 action 中加入 body_select_mode {first,order,random,...} 等模式用于支持 {单一,顺序,随机,...} 的请求发送模式;
+8. min_duration 的时间精度在代码中是秒, 配置中是毫秒, 需要统一成毫秒
