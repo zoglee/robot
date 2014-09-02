@@ -1,9 +1,11 @@
 FIND_PATH(GLIB_INCLUDE_DIR glib.h
+	/usr/include/glib-2.0/
 	/usr/local/include/glib-2.0/
 	DOC "The directory where glib.h resides")
 MESSAGE(STATUS "Looking for glib - found:${GLIB_INCLUDE_DIR}")
 
 FIND_PATH(GLIB_CONFIG_INCLUDE_PATH glibconfig.h
+	/usr/lib/x86_64-linux-gnu/glib-2.0/include/
 	/usr/local/lib/glib-2.0/include
 	DOC "The directory where glib.h resides")
 MESSAGE(STATUS "Looking for glibconfig - found:${GLIB_CONFIG_INCLUDE_PATH}")
@@ -12,6 +14,8 @@ set (GLIB_INCLUDE_DIR ${GLIB_INCLUDE_DIR} ${GLIB_CONFIG_INCLUDE_PATH})
 
 FIND_LIBRARY(GLIB_LIBRARY glib-2.0 
 	/usr/local/lib/
+	/lib/
+	/lib/x86_64-linux-gnu/
 	DOC "The GLIB library")
 
 IF (GLIB_INCLUDE_DIR)

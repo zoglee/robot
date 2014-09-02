@@ -11,3 +11,8 @@
 *.lai
 *.la
 *.a
+
+# Project spec ignore files
+cmake_build/
+proto/out/
+robot

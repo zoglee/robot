@@ -1,5 +1,6 @@
 #include "flags.h"
 
+#include <stdio.h>
 
 #define FLAGS_MUST_GT_0(flag) \
 	bool flag##Validation(const char *flagname, int32_t value) { \
