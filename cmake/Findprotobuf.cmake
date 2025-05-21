@@ -1,11 +1,11 @@
 FIND_PATH( PROTOBUF_INCLUDE_DIR message.h
 	/usr/local/include/google/protobuf
+	/usr/include/google/protobuf
 	DOC "The directory where message.h resides"  )
  
-SET(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
 FIND_LIBRARY( PROTOBUF_LIBRARY
 	NAMES protobuf
-	PATHS /usr/local/lib
+	PATHS /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu
 	DOC "The Protobuf library")
 
 IF (PROTOBUF_INCLUDE_DIR)

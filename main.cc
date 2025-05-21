@@ -15,5 +15,6 @@ int main(int argc, char **argv) {
 	}
 	RunRobots(cfg_root);
 
+	cleanup_robot_config();
 	return 0;
 }
