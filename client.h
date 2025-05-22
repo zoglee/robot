@@ -32,24 +32,24 @@ public:
 
 class Client {
 public:
-	~Client();
+	virtual ~Client(); // Made virtual
 	Client(int max_pkg_len, bool has_checksum);
 
 public:
 	inline bool is_connected(void);
-	inline bool try_connect_to_peer(const std::string &svraddr, std::ostringstream &err);
+	virtual bool try_connect_to_peer(const std::string &svraddr, std::ostringstream &err); // Made virtual
 	inline void close_connection(void);
 	const Buffer &buffer(void) { return buffer_; }
 	void clear_buffer(void) { buffer_.Clear(); }
 
 public:
-	bool send_msg(const Message &msghead, const Message &msg, std::ostringstream &err);
-	bool recv_msg(Message **msghead, Message **msg, bool &complete, std::ostringstream &err); 
+	virtual bool send_msg(const Message &msghead, const Message &msg, std::ostringstream &err); // Made virtual
+	virtual bool recv_msg(Message **msghead, Message **msg, bool &complete, std::ostringstream &err);  // Made virtual
 	bool encode(const Message &msghead, const Message &msg, std::string &pkg); 
 	bool decode(const std::string &pkg, Message **msghead, Message **msg); 
 	int tcp_connect(const std::string &svraddr, std::ostringstream &err);
-	int net_tcp_send(std::ostringstream &errmsg);
-	int net_tcp_recv(std::ostringstream &errmsg);
+	virtual int net_tcp_send(std::ostringstream &errmsg); // Made virtual
+	virtual int net_tcp_recv(std::ostringstream &errmsg); // Made virtual
 
 
 private:
