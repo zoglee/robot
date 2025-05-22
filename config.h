@@ -21,6 +21,8 @@ bool ValidationRobotConfigs(const pbcfg::CfgRoot &cfg);
 bool CollectConfigInfos(const pbcfg::CfgRoot &cfg);
 bool init_robot_config();
 
+void cleanup_robot_config();
+
 
 // UniqRequest 针对每一个 uniq_name 记录请求数据信息
 struct UniqRequest {

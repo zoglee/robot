@@ -61,6 +61,13 @@ bool ValidationRobotConfigs(const pbcfg::CfgRoot &cfg) {
 	return true;
 }
 
+void cleanup_robot_config() {
+	for (UniqNameMapIter it = uniq_name_map.begin(); it != uniq_name_map.end(); ++it) {
+		delete it->second;
+	}
+	uniq_name_map.clear();
+}
+
 bool CollectConfigInfos(const pbcfg::CfgRoot &cfg) {
 	// 如果发现任何 uniq_name 对应的配置中的 type_name 无法创建消息, 那么 robot 会拒绝启动
 	for (int i = 0; i < cfg.body_size(); i++) {
