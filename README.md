@@ -111,6 +111,57 @@ Key configuration sections include:
         *   `timeout`: Timeout for waiting for a response.
     *   Other parameters like `max_pkg_len`, `has_checksum`, etc.
 
+### Frame Header Configuration (via YAML)
+
+The structure of the binary frame header (the bytes preceding the `CsMsgHead` Protobuf message) can now be customized using a YAML file. This allows defining custom packet structures for different server protocols.
+
+*   **Command-Line Flag**: Specify the YAML file using the `--frameheadconfig=<path_to_yaml_file>` flag.
+    *   Example: `./robot --configfullpath=proto/robot.pbconf --frameheadconfig=my_custom_header.yaml`
+    *   Default value: `"frame_header.yaml"` (if this file exists in the working directory, it will be loaded by default). If the flag is empty or the file is not found, the simulator falls back to its original hardcoded frame structure.
+
+*   **YAML Structure**:
+    The YAML file should define a `frame_header` mapping, containing a sequence of `fields`.
+
+    ```yaml
+    frame_header:
+      fields:
+        - name: descriptive_field_name
+          size: <integer_bytes>
+          type: <string_data_type>
+          value: <literal_value_or_calculation_rule_string>
+        # ... more fields ...
+    ```
+
+*   **Field Attributes**:
+    *   `name`: A descriptive name for the field (for clarity in the YAML).
+    *   `size`: The size of the field in bytes (e.g., 1, 2, 4, 8).
+    *   `type`: The data type and endianness. Supported types:
+        *   `uint8`, `int8`
+        *   `uint16_be`, `uint16_le`, `int16_be`, `int16_le`
+        *   `uint32_be`, `uint32_le`, `int32_be`, `int32_le`
+        *   `uint64_be`, `uint64_le`, `int64_be`, `int64_le`
+        *   `fixed_string` (value will be a string, padded with nulls or truncated to `size`).
+    *   `value`: How the field's value is determined:
+        *   **Literal Value**: Can be an integer (e.g., `123`, `0xCAFE`) or a string for `fixed_string` type (e.g., `"HELLO"`).
+        *   `"CALC_TOTAL_PACKET_LENGTH"`: The total length of all fields defined in this `frame_header` YAML structure plus the length of the `CsMsgHead` and `CsMsgBody` Protobuf messages.
+        *   `"CALC_PROTOBUF_HEAD_LENGTH"`: The size of this field itself (as defined by `size`) plus the length of the serialized `CsMsgHead` Protobuf message.
+
+*   **Example (`frame_header.yaml` to mimic default behavior)**:
+    This configuration replicates the two length fields that were previously hardcoded in the client's encoding logic.
+    ```yaml
+    # Example: frame_header.yaml (mimics default behavior)
+    frame_header:
+      fields:
+        - name: total_packet_length
+          size: 4
+          type: uint32_be
+          value: "CALC_TOTAL_PACKET_LENGTH"
+        - name: proto_header_length
+          size: 4
+          type: uint32_be
+          value: "CALC_PROTOBUF_HEAD_LENGTH"
+    ```
+
 ## Project Structure
 
 *   **`/` (Root Directory)**: Contains main source files (`.cc`, `.h`), `CMakeLists.txt`, and build/utility scripts.

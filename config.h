@@ -4,6 +4,7 @@
 #include "common.h"
 #include "pb_master.h"
 #include "robot.pb.h"
+#include "frame_config_types.h" // Ensure this is included
 
 using google::protobuf::Message;
 
@@ -16,6 +17,9 @@ typedef UniqNameMap::iterator UniqNameMapIter;
 extern pbcfg::CfgRoot cfg_root;
 extern int kMaxTotalClientNum;
 extern UniqNameMap uniq_name_map;
+// Add with other global config declarations (like cfg_root)
+extern FrameHeaderConfig global_frame_header_config;
+extern bool global_frame_header_config_loaded; // To track if it was loaded
 
 bool ValidationRobotConfigs(const pbcfg::CfgRoot &cfg);
 bool CollectConfigInfos(const pbcfg::CfgRoot &cfg);

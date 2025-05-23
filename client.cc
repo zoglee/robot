@@ -1,7 +1,121 @@
 #include "client.h"
 #include "pb_master.h"
+#include "config.h" // Added for global_frame_header_config
+#include <arpa/inet.h> // For htonl, htons (should be in common.h but good to ensure here)
+#include <vector>      // For byte manipulation if needed
+#include <iomanip>     // For std::setfill, std::setw (if using stringstream for hex)
+#include <algorithm>   // For std::min
 
+// Anonymous namespace for helper functions
+namespace {
 
+// Helper to append a string, padding with nulls or truncating to target_size
+void append_string_fixed_size(std::string& dest, const std::string& src, int target_size) {
+    if (target_size <= 0) return;
+    std::string temp = src;
+    if (temp.length() > static_cast<size_t>(target_size)) {
+        temp.resize(target_size);
+    } else {
+        temp.resize(target_size, '\0'); // Pad with null characters
+    }
+    dest.append(temp);
+}
+
+// --- Integer to Byte Array Helpers ---
+// Note: These assume network byte order is Big Endian for BE types.
+// For LE types, direct memory copy is fine on LE machines. For portability, byte-by-byte construction is better.
+
+void append_uint8(std::string& dest, uint8_t val) {
+    dest.push_back(static_cast<char>(val));
+}
+
+void append_int8(std::string& dest, int8_t val) {
+    dest.push_back(static_cast<char>(val));
+}
+
+void append_uint16_be(std::string& dest, uint16_t val) {
+    uint16_t net_val = htons(val);
+    dest.append(reinterpret_cast<const char*>(&net_val), sizeof(net_val));
+}
+
+void append_uint16_le(std::string& dest, uint16_t val) {
+    char bytes[2];
+    bytes[0] = val & 0xFF;
+    bytes[1] = (val >> 8) & 0xFF;
+    dest.append(bytes, 2);
+}
+
+void append_int16_be(std::string& dest, int16_t val) {
+    uint16_t net_val = htons(static_cast<uint16_t>(val));
+    dest.append(reinterpret_cast<const char*>(&net_val), sizeof(net_val));
+}
+
+void append_int16_le(std::string& dest, int16_t val) {
+    char bytes[2];
+    uint16_t u_val = static_cast<uint16_t>(val);
+    bytes[0] = u_val & 0xFF;
+    bytes[1] = (u_val >> 8) & 0xFF;
+    dest.append(bytes, 2);
+}
+
+void append_uint32_be(std::string& dest, uint32_t val) {
+    uint32_t net_val = htonl(val);
+    dest.append(reinterpret_cast<const char*>(&net_val), sizeof(net_val));
+}
+
+void append_uint32_le(std::string& dest, uint32_t val) {
+    char bytes[4];
+    bytes[0] = val & 0xFF;
+    bytes[1] = (val >> 8) & 0xFF;
+    bytes[2] = (val >> 16) & 0xFF;
+    bytes[3] = (val >> 24) & 0xFF;
+    dest.append(bytes, 4);
+}
+
+void append_int32_be(std::string& dest, int32_t val) {
+    uint32_t net_val = htonl(static_cast<uint32_t>(val));
+    dest.append(reinterpret_cast<const char*>(&net_val), sizeof(net_val));
+}
+
+void append_int32_le(std::string& dest, int32_t val) {
+    char bytes[4];
+    uint32_t u_val = static_cast<uint32_t>(val);
+    bytes[0] = u_val & 0xFF;
+    bytes[1] = (u_val >> 8) & 0xFF;
+    bytes[2] = (u_val >> 16) & 0xFF;
+    bytes[3] = (u_val >> 24) & 0xFF;
+    dest.append(bytes, 4);
+}
+
+// For 64-bit, htobe64/le64toh are preferred if available (POSIX 2008, but check system)
+// Otherwise, manual byte swapping.
+void append_uint64_be(std::string& dest, uint64_t val) {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    uint64_t net_val = __builtin_bswap64(val);
+#else
+    uint64_t net_val = val;
+#endif
+    dest.append(reinterpret_cast<const char*>(&net_val), sizeof(net_val));
+}
+
+void append_uint64_le(std::string& dest, uint64_t val) {
+#if __BYTE_ORDER == __BIG_ENDIAN
+    uint64_t net_val = __builtin_bswap64(val);
+#else
+    uint64_t net_val = val;
+#endif
+    dest.append(reinterpret_cast<const char*>(&net_val), sizeof(net_val));
+}
+
+void append_int64_be(std::string& dest, int64_t val) {
+    append_uint64_be(dest, static_cast<uint64_t>(val));
+}
+
+void append_int64_le(std::string& dest, int64_t val) {
+    append_uint64_le(dest, static_cast<uint64_t>(val));
+}
+
+} // end anonymous namespace
 
 using google::protobuf::Reflection;
 using google::protobuf::Descriptor;
@@ -90,40 +204,187 @@ bool Client::recv_msg(Message **msghead, Message **msg, bool &complete, std::ost
 }
 
 bool Client::encode(const Message &msghead, const Message &msg, std::string &pkg) {
-	std::string type_name = msg.GetTypeName(); 
+    pkg.clear();
+    std::string type_name = msg.GetTypeName(); // Used for logging
 
-	int32_t headlen = htonl(4 + msghead.ByteSize());
-	int32_t totlen = 4 + 4 + msghead.ByteSize() + msg.ByteSize();
-	if (has_checksum_) {
-		totlen += 4;
-	}
-	totlen = htonl(totlen);
+    if (global_frame_header_config_loaded) {
+        // Custom frame header logic
+        std::string s_msghead_pb;
+        if (!msghead.SerializeToString(&s_msghead_pb)) {
+            LOG(ERROR) << "Failed to serialize msghead for: " << type_name;
+            return false;
+        }
+        std::string s_msgbody_pb;
+        if (!msg.SerializeToString(&s_msgbody_pb)) {
+            LOG(ERROR) << "Failed to serialize msg body for: " << type_name;
+            return false;
+        }
 
-	pkg.clear();
-	pkg.append((char*)(&totlen), sizeof(totlen));
-	pkg.append((char*)(&headlen), sizeof(headlen));
+        size_t csmsghead_pb_len = s_msghead_pb.length();
+        size_t csmsgbody_pb_len = s_msgbody_pb.length();
+        size_t total_payload_len = csmsghead_pb_len + csmsgbody_pb_len;
 
-	if (!msghead.AppendToString(&pkg)) {
-		LOG(ERROR) << "Failed encode msghead for: " << type_name;
-		return false;
-	}
+        // Pre-calculate total size of all custom frame fields for CALC_TOTAL_PACKET_LENGTH
+        size_t total_custom_header_fields_size = 0;
+        for (const auto& field_def : global_frame_header_config.fields) {
+            total_custom_header_fields_size += field_def.size_bytes;
+        }
 
-	if (!msg.AppendToString(&pkg)) {
-		LOG(ERROR) << "Failed encode msg for: " << type_name;
-		return false;
-	}
+        for (const auto& field_def : global_frame_header_config.fields) {
+            uint64_t value_to_pack_numeric = 0;
+            std::string value_to_pack_string;
+            bool is_numeric_value = false;
 
-	if (has_checksum_) {
-		uint32_t sum = calc_checksum(pkg.c_str(), 0, pkg.size());
-		sum = htonl(sum);
-		pkg.append((char*)(&sum), sizeof(sum));
-	}
+            switch (field_def.value_rule) {
+                case FrameFieldValueRule::LITERAL:
+                    if (std::holds_alternative<std::int64_t>(field_def.literal_value)) {
+                        value_to_pack_numeric = static_cast<uint64_t>(std::get<std::int64_t>(field_def.literal_value));
+                        is_numeric_value = true;
+                    } else if (std::holds_alternative<std::string>(field_def.literal_value)) {
+                        value_to_pack_string = std::get<std::string>(field_def.literal_value);
+                    } else {
+                        LOG(ERROR) << "Field " << field_def.name << ": Literal value is not set or has unexpected variant type.";
+                        return false;
+                    }
+                    break;
+                case FrameFieldValueRule::CALC_TOTAL_PACKET_LENGTH:
+                    // Value is total size of custom header + total protobuf payload size
+                    value_to_pack_numeric = total_custom_header_fields_size + total_payload_len;
+                    is_numeric_value = true;
+                    break;
+                case FrameFieldValueRule::CALC_PROTOBUF_HEAD_LENGTH:
+                    // Value is size of this specific field + CsMsgHead protobuf length
+                    // This interpretation might need refinement based on exact requirements,
+                    // e.g., if it's the length of CsMsgHead only, or CsMsgHead + some fixed offset.
+                    // The prompt said "X + CsMsgHead.ByteSize()", where X is a configured constant.
+                    // Assuming for now field_def.size_bytes IS X, or it means the field *contains* X + head_len.
+                    // Let's assume it's the length of the CsMsgHead itself for now.
+                    // A common interpretation is that this field *stores* the length of the protobuf head.
+                    value_to_pack_numeric = csmsghead_pb_len; 
+                    // If it should include its own size or other parts, adjust here.
+                    // E.g., if the rule meant "size of this field + csmsghead_pb_len", it might be:
+                    // value_to_pack_numeric = field_def.size_bytes + csmsghead_pb_len; 
+                    // This needs clarification from requirements. For now, using csmsghead_pb_len.
+                    is_numeric_value = true;
+                    break;
+                default:
+                    LOG(ERROR) << "Field " << field_def.name << ": Unknown or unsupported value_rule.";
+                    return false;
+            }
 
-	VLOG(2) << "[ENCODE:" << pkg.size()
-		<< ": headsize=" << msghead.ByteSize() << "(hlen=" << ntohl(headlen) << ")"
-		<< ", bodysize=" << msg.ByteSize() << "]\n"
-		<< msghead.Utf8DebugString() << msg.Utf8DebugString();
-	return true;
+            // Pack the value
+            switch (field_def.data_type) {
+                case FrameFieldDataType::UINT8:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for UINT8 field " << field_def.name; return false; }
+                    append_uint8(pkg, static_cast<uint8_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::INT8:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for INT8 field " << field_def.name; return false; }
+                    append_int8(pkg, static_cast<int8_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::UINT16_LE:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for UINT16_LE field " << field_def.name; return false; }
+                    append_uint16_le(pkg, static_cast<uint16_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::UINT16_BE:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for UINT16_BE field " << field_def.name; return false; }
+                    append_uint16_be(pkg, static_cast<uint16_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::INT16_LE:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for INT16_LE field " << field_def.name; return false; }
+                    append_int16_le(pkg, static_cast<int16_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::INT16_BE:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for INT16_BE field " << field_def.name; return false; }
+                    append_int16_be(pkg, static_cast<int16_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::UINT32_LE:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for UINT32_LE field " << field_def.name; return false; }
+                    append_uint32_le(pkg, static_cast<uint32_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::UINT32_BE:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for UINT32_BE field " << field_def.name; return false; }
+                    append_uint32_be(pkg, static_cast<uint32_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::INT32_LE:
+                     if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for INT32_LE field " << field_def.name; return false; }
+                    append_int32_le(pkg, static_cast<int32_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::INT32_BE:
+                     if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for INT32_BE field " << field_def.name; return false; }
+                    append_int32_be(pkg, static_cast<int32_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::UINT64_LE:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for UINT64_LE field " << field_def.name; return false; }
+                    append_uint64_le(pkg, value_to_pack_numeric);
+                    break;
+                case FrameFieldDataType::UINT64_BE:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for UINT64_BE field " << field_def.name; return false; }
+                    append_uint64_be(pkg, value_to_pack_numeric);
+                    break;
+                case FrameFieldDataType::INT64_LE:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for INT64_LE field " << field_def.name; return false; }
+                    append_int64_le(pkg, static_cast<int64_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::INT64_BE:
+                    if (!is_numeric_value) { LOG(ERROR) << "Numeric value expected for INT64_BE field " << field_def.name; return false; }
+                    append_int64_be(pkg, static_cast<int64_t>(value_to_pack_numeric));
+                    break;
+                case FrameFieldDataType::FIXED_STRING:
+                    if (is_numeric_value) { LOG(ERROR) << "String value expected for FIXED_STRING field " << field_def.name; return false; }
+                    append_string_fixed_size(pkg, value_to_pack_string, field_def.size_bytes);
+                    break;
+                default:
+                    LOG(FATAL) << "Field " << field_def.name << ": Unimplemented data type for packing: " << static_cast<int>(field_def.data_type);
+                    return false; // Should be unreachable due to FATAL
+            }
+        }
+        // Append serialized protobuf messages
+        pkg.append(s_msghead_pb);
+        pkg.append(s_msgbody_pb);
+
+    } else {
+        // Original logic
+        int32_t csmsghead_pb_len = msghead.ByteSize(); // Original: msghead.ByteSize()
+        int32_t csmsgbody_pb_len = msg.ByteSize(); // Original: msg.ByteSize()
+        
+        // These lengths are for the original hardcoded header structure
+        int32_t fixed_head_field_len = 4; // for the headlen field itself
+        int32_t headlen_val_payload = fixed_head_field_len + csmsghead_pb_len;
+        int32_t headlen_val_network = htonl(headlen_val_payload);
+
+        // totlen includes its own 4 bytes, the headlen field's 4 bytes, 
+        // the protobuf head, and the protobuf body. Checksum added later.
+        int32_t totlen_val_payload = fixed_head_field_len + fixed_head_field_len + csmsghead_pb_len + csmsgbody_pb_len;
+        int32_t totlen_val_network = htonl(totlen_val_payload + (has_checksum_ ? 4 : 0) );
+
+
+        pkg.append(reinterpret_cast<const char*>(&totlen_val_network), sizeof(totlen_val_network));
+        pkg.append(reinterpret_cast<const char*>(&headlen_val_network), sizeof(headlen_val_network));
+
+        if (!msghead.AppendToString(&pkg)) {
+            LOG(ERROR) << "Failed encode msghead for: " << type_name;
+            return false;
+        }
+        if (!msg.AppendToString(&pkg)) {
+            LOG(ERROR) << "Failed encode msg for: " << type_name;
+            return false;
+        }
+    }
+
+    // Checksum logic (applied to the fully constructed pkg)
+    if (has_checksum_) {
+        uint32_t sum = calc_checksum(pkg.c_str(), 0, pkg.size());
+        sum = htonl(sum);
+        pkg.append(reinterpret_cast<const char*>(&sum), sizeof(sum));
+    }
+
+    // VLOG(2) from original, can be adapted
+    VLOG(2) << "[ENCODE:" << pkg.size()
+            << ": (msghead_pb_len=" << msghead.ByteSize() 
+            << ", msgbody_pb_len=" << msg.ByteSize() << ")]\n"
+            << msghead.Utf8DebugString() << msg.Utf8DebugString();
+    return true;
 }
 
 bool Client::decode(const std::string &pkg, Message **msghead, Message **msg) {

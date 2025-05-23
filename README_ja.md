@@ -109,6 +109,57 @@
         *   `timeout`：レスポンスを待つためのタイムアウト。
     *   `max_pkg_len`、`has_checksum`などのその他のパラメータ。
 
+### フレームヘッダー設定 (YAML経由)
+
+バイナリフレームヘッダー（`CsMsgHead` Protobufメッセージの前に置かれるバイト列）の構造をYAMLファイルを使用してカスタマイズできるようになりました。これにより、さまざまなサーバープロトコルに対応するカスタムパケット構造を定義できます。
+
+*   **コマンドラインフラグ**: `--frameheadconfig=<YAMLファイルへのパス>` フラグを使用してYAMLファイルを指定します。
+    *   例: `./robot --configfullpath=proto/robot.pbconf --frameheadconfig=my_custom_header.yaml`
+    *   デフォルト値: `"frame_header.yaml"` （このファイルが作業ディレクトリに存在する場合、デフォルトでロードされます）。フラグが空の場合やファイルが見つからない場合、シミュレータは元のハードコードされたフレーム構造にフォールバックします。
+
+*   **YAML構造**:
+    YAMLファイルは `frame_header` マッピングを定義し、その中に `fields` シーケンスを含める必要があります。
+
+    ```yaml
+    frame_header:
+      fields:
+        - name: descriptive_field_name
+          size: <integer_bytes>
+          type: <string_data_type>
+          value: <literal_value_or_calculation_rule_string>
+        # ... 他のフィールド ...
+    ```
+
+*   **フィールド属性**:
+    *   `name`: フィールドの記述名（主にYAMLの可読性のため）。
+    *   `size`: フィールドのサイズ（バイト単位）（例: 1, 2, 4, 8）。
+    *   `type`: フィールドのデータ型とエンディアン。サポートされている型：
+        *   `uint8`, `int8`
+        *   `uint16_be`, `uint16_le`, `int16_be`, `int16_le` （ビッグエンディアン, リトルエンディアン）
+        *   `uint32_be`, `uint32_le`, `int32_be`, `int32_le`
+        *   `uint64_be`, `uint64_le`, `int64_be`, `int64_le`
+        *   `fixed_string` (`value`は文字列となり、指定された`size`に合わせてNULL文字でパディングされるか切り詰められます)。
+    *   `value`: フィールドの値の決定方法：
+        *   **リテラル値**: 整数（例: `123`, `0xCAFE`）または`fixed_string`型の場合は文字列（例: `"HELLO"`）。
+        *   `"CALC_TOTAL_PACKET_LENGTH"`: この`frame_header` YAML構造で定義された全フィールドの合計長に、`CsMsgHead`および`CsMsgBody` Protobufメッセージの長さを加えたもの。
+        *   `"CALC_PROTOBUF_HEAD_LENGTH"`: このフィールド自体のサイズ（`size`で定義）に、シリアライズされた`CsMsgHead` Protobufメッセージの長さを加えたもの。
+
+*   **例 (`frame_header.yaml` デフォルト動作を模倣)**:
+    この設定は、以前クライアントのエンコーディングロジックでハードコードされていた2つの長さフィールドを再現します。
+    ```yaml
+    # 例: frame_header.yaml (デフォルト動作を模倣)
+    frame_header:
+      fields:
+        - name: total_packet_length
+          size: 4
+          type: uint32_be
+          value: "CALC_TOTAL_PACKET_LENGTH"
+        - name: proto_header_length
+          size: 4
+          type: uint32_be
+          value: "CALC_PROTOBUF_HEAD_LENGTH"
+    ```
+
 ## プロジェクト構造
 
 *   **`/` (ルートディレクトリ)**：メインソースファイル（`.cc`、`.h`）、`CMakeLists.txt`、およびビルド/ユーティリティスクリプトが含まれています。

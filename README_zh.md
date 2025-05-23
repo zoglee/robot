@@ -109,6 +109,57 @@
         *   `timeout`：等待响应的超时时间。
     *   其他参数，如 `max_pkg_len`、`has_checksum` 等。
 
+### 帧头配置 (通过 YAML)
+
+二进制帧头（位于 `CsMsgHead` Protobuf 消息之前的字节序列）的结构现在可以使用 YAML 文件进行自定义。这允许为不同的服务器协议定义自定义的数据包结构。
+
+*   **命令行标志**：使用 `--frameheadconfig=<YAML文件路径>` 标志指定 YAML 文件。
+    *   示例：`./robot --configfullpath=proto/robot.pbconf --frameheadconfig=my_custom_header.yaml`
+    *   默认值：`"frame_header.yaml"` （如果此文件存在于工作目录中，则默认加载）。如果标志为空或文件未找到，模拟器将回退到其原始的硬编码帧结构。
+
+*   **YAML 结构**：
+    YAML 文件应定义一个 `frame_header` 映射，其中包含一个 `fields` 序列。
+
+    ```yaml
+    frame_header:
+      fields:
+        - name: descriptive_field_name
+          size: <integer_bytes>
+          type: <string_data_type>
+          value: <literal_value_or_calculation_rule_string>
+        # ... 更多字段 ...
+    ```
+
+*   **字段属性**：
+    *   `name`：字段的描述性名称（主要为了 YAML 的可读性）。
+    *   `size`：字段的大小（字节）（例如, 1, 2, 4, 8）。
+    *   `type`：字段的数据类型和字节序。支持的类型：
+        *   `uint8`, `int8`
+        *   `uint16_be`, `uint16_le`, `int16_be`, `int16_le` (大端, 小端)
+        *   `uint32_be`, `uint32_le`, `int32_be`, `int32_le`
+        *   `uint64_be`, `uint64_le`, `int64_be`, `int64_le`
+        *   `fixed_string` (`value` 应为字符串，将用空字符填充或截断以适应 `size`)。
+    *   `value`：字段值的确定方式：
+        *   **字面量值**：可以是整数（例如 `123`, `0xCAFE`）或 `fixed_string` 类型的字符串（例如 `"HELLO"`）。
+        *   `"CALC_TOTAL_PACKET_LENGTH"`：该值将是此 `frame_header` YAML 结构中定义的所有字段的总长度，再加上 `CsMsgHead` 和 `CsMsgBody` Protobuf 消息的长度。
+        *   `"CALC_PROTOBUF_HEAD_LENGTH"`：该值将是此字段本身的大小（由 `size` 定义）加上序列化的 `CsMsgHead` Protobuf 消息的长度。
+
+*   **示例 (`frame_header.yaml` 模拟默认行为)**：
+    此配置复制了先前在客户端编码逻辑中硬编码的两个长度字段。
+    ```yaml
+    # 示例: frame_header.yaml (模拟默认行为)
+    frame_header:
+      fields:
+        - name: total_packet_length
+          size: 4
+          type: uint32_be
+          value: "CALC_TOTAL_PACKET_LENGTH"
+        - name: proto_header_length
+          size: 4
+          type: uint32_be
+          value: "CALC_PROTOBUF_HEAD_LENGTH"
+    ```
+
 ## 项目结构
 
 *   **`/` (根目录)**：包含主要源文件（`.cc`、`.h`）、`CMakeLists.txt` 以及构建/实用工具脚本。
