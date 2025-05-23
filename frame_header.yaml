@@ -1,0 +1,10 @@
+frame_header:
+  fields:
+    - name: total_packet_length
+      size: 4
+      type: uint32_be
+      value: "CALC_TOTAL_PACKET_LENGTH"
+    - name: proto_header_length
+      size: 4
+      type: uint32_be
+      value: "CALC_PROTOBUF_HEAD_LENGTH"

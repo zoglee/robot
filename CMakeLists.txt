@@ -15,6 +15,16 @@ FetchContent_Declare(
 # Make Google Test available
 FetchContent_MakeAvailable(googletest)
 
+# Declare yaml-cpp
+FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG 0.8.0 # Using the empirically correct git tag for release 0.8.0
+)
+
+# Make yaml-cpp available
+FetchContent_MakeAvailable(yaml-cpp)
+
 FIND_PACKAGE(glib REQUIRED)
 FIND_PACKAGE(protobuf REQUIRED)
 
@@ -54,6 +64,7 @@ flags.cc
 config.cc
 client.cc
 robot.cc
+frame_config_loader.cc # Added new source file
 main.cc
 )
 INCLUDE_DIRECTORIES(${PROTO_OUT_DIR}) # Was PROTO_PB_DIR, which is the same path
@@ -63,7 +74,15 @@ INCLUDE_DIRECTORIES(${GLIB_INCLUDE_DIR})
 SET(BIN_NAME "robot")
 ADD_DEFINITIONS( "-g -DDEBUG -Wall -MMD -funroll-loops -fPIC" )
 ADD_EXECUTABLE(${BIN_NAME} ${SRC_LIST})
-TARGET_LINK_LIBRARIES (${BIN_NAME} ${GLIB_LIBRARY} "ssl" "glog" "gflags" "protobuf" "pthread")
+TARGET_LINK_LIBRARIES (${BIN_NAME} 
+    ${GLIB_LIBRARY} 
+    "ssl" 
+    "glog" 
+    "gflags" 
+    "protobuf" 
+    "pthread"
+    yaml-cpp # Added yaml-cpp
+)
 
 # Enable testing and add the test executable
 enable_testing()
@@ -82,8 +101,10 @@ SET(ROBOT_LIB_SRC_LIST
 add_executable(
     robot_tests
     tests/test_robot_run_group_once.cc
+    tests/test_frame_config_loader.cc # Added new test file
     # tests/dummy_test.cc # Removed dummy test
     ${ROBOT_LIB_SRC_LIST}
+    frame_config_loader.cc # Added new source file to tests as well
 )
 
 target_link_libraries(
@@ -92,6 +113,7 @@ target_link_libraries(
     gtest_main
     gmock # Added gmock library
     ${GLIB_LIBRARY} "ssl" "glog" "gflags" "protobuf" "pthread"
+    yaml-cpp # Added yaml-cpp to tests as frame_config_loader uses it
 )
 
 # Add include directories for gtest and gmock

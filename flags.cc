@@ -19,3 +19,4 @@ DEFINE_int32(looptime, 10, "loop time (seconds)");
 FLAGS_MUST_GT_0(looptime);
 
 DEFINE_string(configfullpath, "./proto/robot.pbconf", "fullpath of the config file");
+DEFINE_string(frameheadconfig, "frame_header.yaml", "Path to the frame header YAML configuration file");

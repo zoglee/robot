@@ -6,6 +6,10 @@ pbcfg::CfgRoot cfg_root;
 int kMaxTotalClientNum = 10000;
 UniqNameMap uniq_name_map;
 
+// Define global frame header config variables
+FrameHeaderConfig global_frame_header_config;
+bool global_frame_header_config_loaded = false;
+
 
 bool ValidationRobotConfigs(const pbcfg::CfgRoot &cfg) {
 	int total_client = 0;
